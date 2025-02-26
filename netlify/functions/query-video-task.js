@@ -3,18 +3,29 @@ const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 
 // Function to generate API token
+// Function to generate API token - updated version
 function generateKlingToken(accessKey, secretKey) {
   const now = Math.floor(Date.now() / 1000);
   
   const payload = {
-    iss: accessKey,
-    exp: now + 3600, // Token valid for 1 hour
-    iat: now
+    iss: accessKey,      // Issuer
+    exp: now + 3600,     // Expiration time (1 hour from now)
+    iat: now,            // Issued at time
+    nbf: now,            // Not valid before
+    sub: 'api_access',   // Subject
+    jti: now + '-' + Math.random().toString(36).substring(2, 10)  // JWT ID (unique)
   };
   
-  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+  const options = {
+    algorithm: 'HS256',
+    header: {
+      typ: 'JWT',
+      alg: 'HS256'
+    }
+  };
+  
+  return jwt.sign(payload, secretKey, options);
 }
-
 exports.handler = async (event, context) => {
   // Only allow GET requests
   if (event.httpMethod !== 'GET') {
@@ -52,7 +63,9 @@ exports.handler = async (event, context) => {
     const response = await fetch(apiEndpoint, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiToken}`
+        'Authorization': `Bearer ${apiToken}`,
+        'Accept': 'application/json',
+        'User-Agent': 'KlingAI-Client/1.0'
       }
     });
     
