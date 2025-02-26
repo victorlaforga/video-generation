@@ -63,8 +63,8 @@ exports.handler = async function(event, context) {
     // Generate API token
     const apiToken = generateKlingToken(accessKey, secretKey);
     
-    // Prepare the API request data
-    const apiEndpoint = 'https://api.klingai.com/kling/v1/img2video/create-task';
+    // Prepare the API request data - corrected endpoint
+    const apiEndpoint = 'https://api.klingai.com/api/v1/img2video/create-task';
     
     // Create request body based on the model version
     const modelName = data.model || 'V1.0';

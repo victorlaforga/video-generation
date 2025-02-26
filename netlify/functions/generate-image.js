@@ -56,7 +56,8 @@ exports.handler = async function(event, context) {
     const apiToken = generateKlingToken(accessKey, secretKey);
     
     // Prepare the API request data
-    const apiEndpoint = 'https://api.klingai.com/kolors/v1/text2image/create-task';
+    // Corrected based on documentation
+    const apiEndpoint = 'https://api.klingai.com/api/v1/text2image/create-task';
     
     // Create request body
     const requestData = {
