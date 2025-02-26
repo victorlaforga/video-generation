@@ -45,8 +45,8 @@ exports.handler = async (event, context) => {
     // Generate API token
     const apiToken = generateKlingToken(accessKey, secretKey);
     
-    // Query the task status - corrected endpoint
-    const apiEndpoint = `https://api.klingai.com/api/v1/img2video/query-task?task_id=${taskId}`;
+    // Query the task status - UPDATED ENDPOINT
+    const apiEndpoint = `https://api.klingai.com/v1/img2video/query-task?task_id=${taskId}`;
     console.log('Querying task status at:', apiEndpoint);
     
     const response = await fetch(apiEndpoint, {
