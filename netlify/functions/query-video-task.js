@@ -24,12 +24,16 @@ exports.handler = async (event, context) => {
     };
   }
   
+  console.log('Query video task function called');
+  
   try {
     // Get query parameters
     const params = event.queryStringParameters;
     const taskId = params.task_id;
     const accessKey = params.access_key;
     const secretKey = params.secret_key;
+    
+    console.log('Query params received:', { task_id: taskId, has_access_key: !!accessKey, has_secret_key: !!secretKey });
     
     if (!taskId || !accessKey || !secretKey) {
       return {
@@ -43,6 +47,7 @@ exports.handler = async (event, context) => {
     
     // Query the task status
     const apiEndpoint = `https://api.klingai.com/kling/v1/img2video/query-task?task_id=${taskId}`;
+    console.log('Querying task status at:', apiEndpoint);
     
     const response = await fetch(apiEndpoint, {
       method: 'GET',
@@ -51,7 +56,23 @@ exports.handler = async (event, context) => {
       }
     });
     
-    const responseData = await response.json();
+    const responseText = await response.text();
+    console.log('API response status:', response.status);
+    console.log('API response body:', responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.log('Error parsing API response:', e);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          message: 'Error parsing API response',
+          rawResponse: responseText
+        })
+      };
+    }
     
     if (!response.ok) {
       return {
@@ -96,7 +117,7 @@ exports.handler = async (event, context) => {
     };
     
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in query video task function:', error);
     
     return {
       statusCode: 500,

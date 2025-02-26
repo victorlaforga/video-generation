@@ -800,7 +800,7 @@
           imageResults.innerHTML = ''; // Clear previous results
         
           try {
-            // Create simple JSON data for testing
+            // Create request data object
             const requestData = {
               prompt: imagePrompt.value,
               negative_prompt: imageNegativePrompt.value || '',
@@ -808,14 +808,26 @@
               aspect_ratio: imageAspectRatio.value,
               count: imageCount.value,
               access_key: accessKey,
-              secret_key: secretKey,
-              testing: true // Flag for testing
+              secret_key: secretKey
             };
         
+            // If there's an image, convert it to base64
+            if (imageUpload.files.length > 0) {
+              const file = imageUpload.files[0];
+              const base64Image = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+              });
+              
+              requestData.image_base64 = base64Image;
+              console.log('Image included in request (base64 length):', base64Image.length);
+            } else {
+              console.log('No image included in request');
+            }
+        
+            // Send to our Netlify function
             console.log('Sending image generation request...');
-            console.log('Request data (without base64):', {...requestData, access_key: '***', secret_key: '***'});
-            
-            // First try without the image to test basic functionality
             const response = await fetch('/.netlify/functions/generate-image', {
               method: 'POST',
               headers: {
@@ -842,17 +854,9 @@
             
             console.log('Image generation task created:', responseData);
             
-            // Mock success for testing
-            alert('Task created with ID: ' + responseData.task_id);
-            
-            // Handle created task - normally we would poll here
-            // await pollImageTaskStatus(taskId, accessKey, secretKey);
-            
-            // For now, just display some mock results
-            displayImageResults([
-              {id: 'mock1', url: 'https://picsum.photos/seed/test1/400/400'},
-              {id: 'mock2', url: 'https://picsum.photos/seed/test2/400/400'}
-            ], imagePrompt.value, imageNegativePrompt.value);
+            // Poll for task status
+            const taskId = responseData.task_id;
+            await pollImageTaskStatus(taskId, accessKey, secretKey);
             
           } catch (error) {
             console.error('Image generation error:', error);
@@ -866,165 +870,382 @@
 
 
         generateVideoButton.addEventListener('click', async () => {
-  console.log('Video generation button clicked');
-  
-  // Get access and secret keys
-  const accessKey = document.getElementById('accessKey').value;
-  const secretKey = document.getElementById('secretKey').value;
-
-  if (!accessKey || !secretKey) {
-    alert('Please enter your API credentials in the API Settings section');
-    return;
-  }
-
-  // Save keys for future use
-  saveApiKeys();
-
-  if (!videoImageUpload.files.length) {
-    alert('Please upload a source image');
-    return;
-  }
-
-  if (!videoPrompt.value.trim()) {
-    alert('Please enter a prompt');
-    return;
-  }
-
-  // Show loading
-  videoLoading.style.display = 'block';
-  generateVideoButton.disabled = true;
-  videoResults.innerHTML = ''; // Clear previous results
-
-  try {
-    // Create simple JSON data for testing first (without image)
-    const requestData = {
-      prompt: videoPrompt.value,
-      negative_prompt: videoNegativePrompt.value || '',
-      mode: videoMode.value,
-      model: videoModel.value,
-      duration: videoDuration.value,
-      aspect_ratio: videoAspectRatio.value,
-      access_key: accessKey,
-      secret_key: secretKey,
-      testing: true // Flag for testing
-    };
-
-    console.log('Sending video generation request without image for testing...');
-    console.log('Request data (without base64):', {...requestData, access_key: '***', secret_key: '***'});
-    
-    // First try without the image to test basic functionality
-    const response = await fetch('/.netlify/functions/generate-video', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestData)
-    });
-    
-    console.log('Response status:', response.status);
-    const responseText = await response.text();
-    console.log('Response text:', responseText);
-    
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse response as JSON:', e);
-      throw new Error('Invalid response from server: ' + responseText);
-    }
-    
-    if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to generate video');
-    }
-    
-    console.log('Video generation task created:', responseData);
-    
-    // Mock success for testing
-    alert('Task created with ID: ' + responseData.task_id);
-    
-    // Mock results display
-    displayVideoResults(
-      {id: 'mock_vid', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'}, 
-      videoPrompt.value, 
-      videoNegativePrompt.value, 
-      videoPreviewImage.src
-    );
-    
-  } catch (error) {
-    console.error('Video generation error:', error);
-    alert('Video Generation Error: ' + error.message);
-  } finally {
-    // Hide loading
-    videoLoading.style.display = 'none';
-    generateVideoButton.disabled = false;
-  }
-});
+          console.log('Video generation button clicked');
+          
+          // Get access and secret keys
+          const accessKey = document.getElementById('accessKey').value;
+          const secretKey = document.getElementById('secretKey').value;
+        
+          if (!accessKey || !secretKey) {
+            alert('Please enter your API credentials in the API Settings section');
+            return;
+          }
+        
+          // Save keys for future use
+          saveApiKeys();
+        
+          if (!videoImageUpload.files.length) {
+            alert('Please upload a source image');
+            return;
+          }
+        
+          if (!videoPrompt.value.trim()) {
+            alert('Please enter a prompt');
+            return;
+          }
+        
+          // Show loading
+          videoLoading.style.display = 'block';
+          generateVideoButton.disabled = true;
+          videoResults.innerHTML = ''; // Clear previous results
+        
+          try {
+            // Convert image to base64
+            const file = videoImageUpload.files[0];
+            const base64Image = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(file);
+            });
+            
+            // Create request data object
+            const requestData = {
+              prompt: videoPrompt.value,
+              negative_prompt: videoNegativePrompt.value || '',
+              mode: videoMode.value,
+              model: videoModel.value,
+              duration: videoDuration.value,
+              aspect_ratio: videoAspectRatio.value,
+              image_base64: base64Image,
+              access_key: accessKey,
+              secret_key: secretKey
+            };
+            
+            // Send to our Netlify function
+            console.log('Sending video generation request...');
+            console.log('Image base64 length:', base64Image.length);
+            
+            const response = await fetch('/.netlify/functions/generate-video', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(requestData)
+            });
+            
+            console.log('Response status:', response.status);
+            const responseText = await response.text();
+            console.log('Response text:', responseText);
+            
+            let responseData;
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (e) {
+              console.error('Failed to parse response as JSON:', e);
+              throw new Error('Invalid response from server: ' + responseText);
+            }
+            
+            if (!response.ok) {
+              throw new Error(responseData.message || 'Failed to generate video');
+            }
+            
+            console.log('Video generation task created:', responseData);
+            
+            // Handle created task - check for completion
+            const taskId = responseData.task_id;
+            await pollVideoTaskStatus(taskId, accessKey, secretKey);
+            
+          } catch (error) {
+            console.error('Video generation error:', error);
+            alert('Video Generation Error: ' + error.message);
+          } finally {
+            // Hide loading
+            videoLoading.style.display = 'none';
+            generateVideoButton.disabled = false;
+          }
+        });
 
         // Poll for image task completion
-        async function pollImageTaskStatus(taskId, accessKey, secretKey) {
-            try {
-                // Create a status indicator
-                const statusElement = document.createElement('div');
-                statusElement.className = 'task-status pending';
-                statusElement.textContent = 'Task created, waiting for processing...';
-                imageResults.appendChild(statusElement);
-                
-                // Poll for status updates
-                let isCompleted = false;
-                let attempts = 0;
-                const maxAttempts = 30; // 5 minutes (10 second intervals)
-                
-                while (!isCompleted && attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
-                    
-                    const queryParams = new URLSearchParams({
-                        task_id: taskId,
-                        access_key: accessKey,
-                        secret_key: secretKey
-                    });
-                    
-                    const response = await fetch(`/.netlify/functions/query-image-task?${queryParams}`);
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || 'Failed to query task status');
-                    }
-                    
-                    const taskData = await response.json();
-                    
-                    // Update status display
-                    if (taskData.status === 'completed') {
-                        isCompleted = true;
-                        statusElement.className = 'task-status completed';
-                        statusElement.textContent = 'Task completed!';
-                        
-                        // Display the results
-                        displayImageResults(taskData.results, imagePrompt.value, imageNegativePrompt.value);
-                    } else if (taskData.status === 'failed') {
-                        isCompleted = true;
-                        statusElement.className = 'task-status failed';
-                        statusElement.textContent = `Task failed: ${taskData.error || 'Unknown error'}`;
-                    } else {
-                        statusElement.className = 'task-status processing';
-                        statusElement.textContent = `Task processing... (${Math.min(90, attempts * 3)}%)`;
-                    }
-                    
-                    attempts++;
-                }
-                
-                if (!isCompleted) {
-                    statusElement.className = 'task-status failed';
-                    statusElement.textContent = 'Task timed out. It may still complete, please check again later.';
-                }
-                
-                // Scroll to results
-                imageResults.scrollIntoView({ behavior: 'smooth' });
-            } catch (error) {
-                handleApiError(error, 'Task Status Check');
-            }
+       
+        // Poll for image task completion
+async function pollImageTaskStatus(taskId, accessKey, secretKey) {
+  try {
+    // Create a status indicator
+    const statusElement = document.createElement('div');
+    statusElement.className = 'task-status pending';
+    statusElement.textContent = 'Task created, waiting for processing...';
+    imageResults.appendChild(statusElement);
+    
+    // Poll for status updates
+    let isCompleted = false;
+    let attempts = 0;
+    const maxAttempts = 30; // 5 minutes (10 second intervals)
+    
+    while (!isCompleted && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+      
+      const queryParams = new URLSearchParams({
+        task_id: taskId,
+        access_key: accessKey,
+        secret_key: secretKey
+      });
+      
+      console.log('Polling image task status:', taskId);
+      const response = await fetch(`/.netlify/functions/query-image-task?${queryParams}`);
+      
+      console.log('Poll response status:', response.status);
+      const responseText = await response.text();
+      console.log('Poll response text:', responseText);
+      
+      let taskData;
+      try {
+        taskData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse task status response:', e);
+        continue;
+      }
+      
+      if (!response.ok) {
+        console.error('Error polling task status:', taskData);
+        statusElement.className = 'task-status failed';
+        statusElement.textContent = `Error checking status: ${taskData.message || 'Unknown error'}`;
+        return;
+      }
+      
+      // Update status display
+      if (taskData.status === 'completed') {
+        isCompleted = true;
+        statusElement.className = 'task-status completed';
+        statusElement.textContent = 'Task completed!';
+        
+        // Display the results
+        if (taskData.results && taskData.results.length > 0) {
+          displayImageResults(taskData.results, imagePrompt.value, imageNegativePrompt.value);
+        } else {
+          statusElement.textContent = 'Task completed but no results returned.';
         }
+      } else if (taskData.status === 'failed') {
+        isCompleted = true;
+        statusElement.className = 'task-status failed';
+        statusElement.textContent = `Task failed: ${taskData.error || 'Unknown error'}`;
+      } else {
+        statusElement.className = 'task-status processing';
+        statusElement.textContent = `Task processing... (${Math.min(90, attempts * 3)}%)`;
+      }
+      
+      attempts++;
+    }
+    
+    if (!isCompleted) {
+      statusElement.className = 'task-status failed';
+      statusElement.textContent = 'Task timed out. It may still complete, please check again later.';
+    }
+    
+    // Scroll to results
+    imageResults.scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error('Error polling task status:', error);
+    alert('Error checking task status: ' + error.message);
+  }
+}
 
-        // Display Image Results
+// Poll for video task completion
+async function pollVideoTaskStatus(taskId, accessKey, secretKey) {
+  try {
+    // Create a status indicator
+    const statusElement = document.createElement('div');
+    statusElement.className = 'task-status pending';
+    statusElement.textContent = 'Task created, waiting for processing...';
+    videoResults.appendChild(statusElement);
+    
+    // Save source image for reference
+    const sourceImageURL = videoPreviewImage.src;
+    
+    // Poll for status updates
+    let isCompleted = false;
+    let attempts = 0;
+    const maxAttempts = 60; // 10 minutes (10 second intervals)
+    
+    while (!isCompleted && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+      
+      const queryParams = new URLSearchParams({
+        task_id: taskId,
+        access_key: accessKey,
+        secret_key: secretKey
+      });
+      
+      console.log('Polling video task status:', taskId);
+      const response = await fetch(`/.netlify/functions/query-video-task?${queryParams}`);
+      
+      console.log('Poll response status:', response.status);
+      const responseText = await response.text();
+      console.log('Poll response text:', responseText);
+      
+      let taskData;
+      try {
+        taskData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse task status response:', e);
+        continue;
+      }
+      
+      if (!response.ok) {
+        console.error('Error polling task status:', taskData);
+        statusElement.className = 'task-status failed';
+        statusElement.textContent = `Error checking status: ${taskData.message || 'Unknown error'}`;
+        return;
+      }
+      
+      // Update status display
+      if (taskData.status === 'completed') {
+        isCompleted = true;
+        statusElement.className = 'task-status completed';
+        statusElement.textContent = 'Task completed!';
+        
+        // Display the results
+        if (taskData.results) {
+          displayVideoResults(taskData.results, videoPrompt.value, videoNegativePrompt.value, sourceImageURL);
+        } else {
+          statusElement.textContent = 'Task completed but no results returned.';
+        }
+      } else if (taskData.status === 'failed') {
+        isCompleted = true;
+        statusElement.className = 'task-status failed';
+        statusElement.textContent = `Task failed: ${taskData.error || 'Unknown error'}`;
+      } else {
+        statusElement.className = 'task-status processing';
+        statusElement.textContent = `Task processing... (${Math.min(90, attempts * 1.5)}%)`;
+      }
+      
+      attempts++;
+    }
+    
+    if (!isCompleted) {
+      statusElement.className = 'task-status failed';
+      statusElement.textContent = 'Task timed out. It may still complete, please check again later.';
+    }
+    
+    // Scroll to results
+    videoResults.scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error('Error polling task status:', error);
+    alert('Error checking task status: ' + error.message);
+  }
+}
+   // Display Video Results
+function displayVideoResults(video, prompt, negativePrompt, sourceImageURL) {
+  console.log('Displaying video results:', video);
+  
+  // Remove any status indicator
+  const statusElements = document.querySelectorAll('.task-status');
+  statusElements.forEach(element => element.remove());
+  
+  const resultCard = document.createElement('div');
+  resultCard.className = 'result-card';
+  
+  // Add source image preview to show it was used in generation
+  const sourceImagePreview = sourceImageURL ? 
+      `<div class="source-image-container">
+          <div class="source-image-label">Source Image Used:</div>
+          <img src="${sourceImageURL}" alt="Source image" class="source-image-preview">
+      </div>` : '';
+  
+  resultCard.innerHTML = `
+      ${sourceImagePreview}
+      <video src="${video.url}" controls class="result-video"></video>
+      <div class="result-info">
+          <div class="result-prompt">${prompt}</div>
+          ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+          <div class="result-info-details">
+              <div>Model: ${videoModel.value}</div>
+              <div>Mode: ${videoMode.value}</div>
+              <div>Duration: ${videoDuration.value}s</div>
+          </div>
+          <div class="result-actions">
+              <button class="result-button download-button">Download</button>
+          </div>
+      </div>
+  `;
+  
+  // Add click handler for the download button
+  const downloadButton = resultCard.querySelector('.download-button');
+  downloadButton.addEventListener('click', () => {
+      // Create a temporary anchor element and trigger download
+      const a = document.createElement('a');
+      a.href = video.url;
+      a.download = `kling_video_${video.id || new Date().getTime()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  });
+  
+  videoResults.appendChild(resultCard);
+}
+
+// Display Image Results
+function displayImageResults(images, prompt, negativePrompt) {
+  console.log('Displaying image results:', images);
+  
+  // Remove any status indicator
+  const statusElements = document.querySelectorAll('.task-status');
+  statusElements.forEach(element => element.remove());
+  
+  images.forEach(image => {
+      const resultCard = document.createElement('div');
+      resultCard.className = 'result-card';
+      
+      resultCard.innerHTML = `
+          <img src="${image.url}" alt="Generated image" class="result-image">
+          <div class="result-info">
+              <div class="result-prompt">${prompt}</div>
+              ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+              <div class="result-actions">
+                  <button class="result-button download-image-button">Download</button>
+                  <button class="result-button convert-button">Convert to Video</button>
+              </div>
+          </div>
+      `;
+      
+      // Add click handler for the download button
+      const downloadButton = resultCard.querySelector('.download-image-button');
+      downloadButton.addEventListener('click', () => {
+          // Create a temporary anchor element and trigger download
+          const a = document.createElement('a');
+          a.href = image.url;
+          a.download = `kling_image_${image.id || new Date().getTime()}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+      });
+      
+      // Add click handler for convert to video button
+      const convertButton = resultCard.querySelector('.convert-button');
+      convertButton.addEventListener('click', () => {
+          // Switch to video tab
+          tabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(content => content.classList.remove('active'));
+          
+          const videoTab = document.querySelector('.tab[data-tab="video-generation"]');
+          videoTab.classList.add('active');
+          
+          const videoContent = document.getElementById('video-generation');
+          videoContent.classList.add('active');
+          
+          // Set preview image
+          videoPreviewImage.src = image.url;
+          videoPreviewImage.style.display = 'block';
+          
+          // Set the video prompt to match the image prompt
+          videoPrompt.value = prompt;
+          
+          // Scroll to the video generation section
+          videoContent.scrollIntoView({ behavior: 'smooth' });
+      });
+      
+      imageResults.appendChild(resultCard);
+  });
+}     // Display Image Results
         function displayImageResults(images, prompt, negativePrompt) {
             // Remove any status indicator
             const statusElements = document.querySelectorAll('.task-status');
