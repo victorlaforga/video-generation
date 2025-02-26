@@ -1460,3 +1460,37 @@ document.getElementById('testFunction').addEventListener('click', async () => {
   }
 });
 </script>
+<button id="testApiButton" style="background-color: orange; color: white; padding: 10px; margin: 10px;">Test API Endpoints</button>
+
+<script>
+document.getElementById('testApiButton').addEventListener('click', async () => {
+  const accessKey = document.getElementById('accessKey').value;
+  const secretKey = document.getElementById('secretKey').value;
+
+  if (!accessKey || !secretKey) {
+    alert('Please enter your API credentials in the API Settings section');
+    return;
+  }
+
+  try {
+    console.log('Testing API endpoints...');
+    const response = await fetch('/.netlify/functions/test-api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        secret_key: secretKey
+      })
+    });
+    
+    const data = await response.json();
+    console.log('API test results:', data);
+    alert('API test complete. See console for results.');
+  } catch (error) {
+    console.error('API test error:', error);
+    alert('API test failed: ' + error.message);
+  }
+});
+</script>
