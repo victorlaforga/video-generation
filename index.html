@@ -1110,6 +1110,119 @@
                 imageResults.appendChild(resultCard);
             });
         }
+        // Display Video Results function that was missing
+function displayVideoResults(video, prompt, negativePrompt, sourceImageURL) {
+  console.log('Displaying video results:', video);
+  
+  // Remove any status indicator
+  const statusElements = document.querySelectorAll('.task-status');
+  statusElements.forEach(element => element.remove());
+  
+  const resultCard = document.createElement('div');
+  resultCard.className = 'result-card';
+  
+  // Add source image preview to show it was used in generation
+  const sourceImagePreview = sourceImageURL ? 
+      `<div class="source-image-container">
+          <div class="source-image-label">Source Image Used:</div>
+          <img src="${sourceImageURL}" alt="Source image" class="source-image-preview">
+      </div>` : '';
+  
+  resultCard.innerHTML = `
+      ${sourceImagePreview}
+      <video src="${video.url}" controls class="result-video"></video>
+      <div class="result-info">
+          <div class="result-prompt">${prompt}</div>
+          ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+          <div class="result-info-details">
+              <div>Model: ${videoModel.value}</div>
+              <div>Mode: ${videoMode.value}</div>
+              <div>Duration: ${videoDuration.value}s</div>
+          </div>
+          <div class="result-actions">
+              <button class="result-button download-button">Download</button>
+          </div>
+      </div>
+  `;
+  
+  // Add click handler for the download button
+  const downloadButton = resultCard.querySelector('.download-button');
+  downloadButton.addEventListener('click', () => {
+      // Create a temporary anchor element and trigger download
+      const a = document.createElement('a');
+      a.href = video.url;
+      a.download = `kling_video_${video.id || new Date().getTime()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  });
+  
+  videoResults.appendChild(resultCard);
+}
+
+// Similarly, let's also check if displayImageResults exists
+function displayImageResults(images, prompt, negativePrompt) {
+  console.log('Displaying image results:', images);
+  
+  // Remove any status indicator
+  const statusElements = document.querySelectorAll('.task-status');
+  statusElements.forEach(element => element.remove());
+  
+  images.forEach(image => {
+      const resultCard = document.createElement('div');
+      resultCard.className = 'result-card';
+      
+      resultCard.innerHTML = `
+          <img src="${image.url}" alt="Generated image" class="result-image">
+          <div class="result-info">
+              <div class="result-prompt">${prompt}</div>
+              ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+              <div class="result-actions">
+                  <button class="result-button download-image-button">Download</button>
+                  <button class="result-button convert-button">Convert to Video</button>
+              </div>
+          </div>
+      `;
+      
+      // Add click handler for the download button
+      const downloadButton = resultCard.querySelector('.download-image-button');
+      downloadButton.addEventListener('click', () => {
+          // Create a temporary anchor element and trigger download
+          const a = document.createElement('a');
+          a.href = image.url;
+          a.download = `kling_image_${image.id || new Date().getTime()}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+      });
+      
+      // Add click handler for convert to video button
+      const convertButton = resultCard.querySelector('.convert-button');
+      convertButton.addEventListener('click', () => {
+          // Switch to video tab
+          tabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(content => content.classList.remove('active'));
+          
+          const videoTab = document.querySelector('.tab[data-tab="video-generation"]');
+          videoTab.classList.add('active');
+          
+          const videoContent = document.getElementById('video-generation');
+          videoContent.classList.add('active');
+          
+          // Set preview image
+          videoPreviewImage.src = image.url;
+          videoPreviewImage.style.display = 'block';
+          
+          // Set the video prompt to match the image prompt
+          videoPrompt.value = prompt;
+          
+          // Scroll to the video generation section
+          videoContent.scrollIntoView({ behavior: 'smooth' });
+      });
+      
+      imageResults.appendChild(resultCard);
+  });
+}
       </script>
       <button id="testFunction" style="background-color: green; color: white; padding: 10px; margin: 10px;">Test Netlify Function</button>
 
