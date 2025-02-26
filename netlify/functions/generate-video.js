@@ -164,3 +164,8 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+generateVideoButton.addEventListener('click', async () => {
+    console.log('Video generation button clicked');
+    // Rest of your code
+  });

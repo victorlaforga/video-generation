@@ -23,10 +23,32 @@ function generateKlingToken(accessKey, secretKey) {
 
 // Process the multipart form data
 async function parseMultipartForm(event) {
+  // Check if the event.body is base64 encoded
+  if (event.isBase64Encoded) {
+    event.body = Buffer.from(event.body, 'base64').toString();
+  }
+  
   return new Promise((resolve, reject) => {
     const form = new multiparty.Form();
     
-    form.parse(event, (error, fields, files) => {
+    // Mock a req object that multiparty can work with
+    const req = {
+      headers: event.headers,
+      body: event.body
+    };
+    
+    // Add an 'on' function to handle the data
+    req.on = function(event, handler) {
+      if (event === 'data') {
+        handler(Buffer.from(this.body));
+      }
+      if (event === 'end') {
+        handler();
+      }
+      return this;
+    };
+    
+    form.parse(req, (error, fields, files) => {
       if (error) return reject(error);
       
       // Convert fields from arrays to single values
