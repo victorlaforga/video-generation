@@ -1,0 +1,1817 @@
+// This file contains the complete integration for Kling AI
+// We'll use a Netlify function approach so this can be easily deployed
+
+// index.html - Frontend interface
+const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kling AI Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <style>
+        :root {
+            --primary: #4a6bef;
+            --primary-light: #6c8aff;
+            --primary-dark: #3a50a9;
+            --secondary: #ff6b6b;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--gray-100);
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--gray-700);
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--gray-300);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--primary-light);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        .image-upload {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            border: 2px dashed var(--gray-300);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .image-upload:hover {
+            border-color: var(--primary-light);
+            background-color: rgba(74, 107, 239, 0.05);
+        }
+
+        .image-upload input {
+            display: none;
+        }
+
+        .image-upload-icon {
+            font-size: 3rem;
+            color: var(--gray-300);
+            margin-bottom: 1rem;
+        }
+
+        .image-upload-text {
+            font-size: 1rem;
+            color: var(--gray-700);
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 180px;
+            display: none;
+            margin-bottom: 1rem;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            text-align: center;
+            color: white;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+
+        .button:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .button:disabled {
+            background-color: var(--gray-300);
+            cursor: not-allowed;
+        }
+
+        .slider-container {
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        .slider-value {
+            text-align: right;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .results-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--gray-800);
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .result-card {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .result-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .result-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .result-video {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+            background: #000;
+        }
+
+        .result-info {
+            padding: 1rem;
+            background-color: white;
+        }
+
+        .result-prompt {
+            font-size: 0.875rem;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .result-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+        }
+
+        .result-button {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            background-color: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .result-button:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--gray-200);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: var(--secondary);
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .api-settings {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .settings-toggle {
+            font-size: 0.875rem;
+            color: var(--primary);
+            cursor: pointer;
+        }
+
+        .settings-content {
+            display: none;
+        }
+
+        .settings-content.show {
+            display: block;
+        }
+
+        .source-image-preview {
+            max-width: 100%;
+            max-height: 180px;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+        
+        .source-image-container {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background-color: var(--gray-100);
+            border-radius: 4px;
+        }
+        
+        .source-image-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+        }
+        
+        .result-info-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+            font-size: 0.75rem;
+            color: var(--gray-700);
+        }
+
+        .task-status {
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .task-status.pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .task-status.processing {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+
+        .task-status.completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .task-status.failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">Kling AI Interface</div>
+            <div class="subtitle">Create stunning AI-generated images and videos</div>
+        </header>
+
+        <div class="api-settings">
+            <div class="settings-title">
+                API Settings
+                <span class="settings-toggle" id="settingsToggle">Show</span>
+            </div>
+            <div class="settings-content" id="settingsContent">
+                <div class="form-group">
+                    <label for="accessKey">Access Key</label>
+                    <input type="text" id="accessKey" placeholder="Enter your Access Key">
+                </div>
+                <div class="form-group">
+                    <label for="secretKey">Secret Key</label>
+                    <input type="text" id="secretKey" placeholder="Enter your Secret Key">
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="image-generation">Image Generation</div>
+            <div class="tab" data-tab="video-generation">Image to Video</div>
+        </div>
+
+        <div class="tab-content active" id="image-generation">
+            <div class="grid-container">
+                <div>
+                    <div class="form-group">
+                        <label for="imageUpload">Reference Image (Optional)</label>
+                        <div class="image-upload" id="imageUploadContainer">
+                            <input type="file" id="imageUpload" accept="image/*">
+                            <div class="image-upload-icon">📷</div>
+                            <div class="image-upload-text">Click to upload or drag and drop</div>
+                        </div>
+                        <img id="previewImage" class="preview-image">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imagePrompt">Prompt</label>
+                        <textarea id="imagePrompt" placeholder="Describe the image you want to generate..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imageNegativePrompt">Negative Prompt (Optional)</label>
+                        <textarea id="imageNegativePrompt" placeholder="Describe what you want to avoid in the image..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imageReferenceStrength">Reference Strength: <span id="strengthValue">0.5</span></label>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="1" step="0.01" value="0.5" class="slider" id="imageReferenceStrength">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imageAspectRatio">Aspect Ratio</label>
+                        <select id="imageAspectRatio">
+                            <option value="1:1">1:1 (Square)</option>
+                            <option value="4:3">4:3 (Standard)</option>
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="9:16">9:16 (Portrait)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="imageCount">Number of Images</label>
+                        <select id="imageCount">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="4">4</option>
+                        </select>
+                    </div>
+
+                    <button id="generateImageButton" class="button">Generate Images</button>
+                </div>
+
+                <div class="results-section">
+                    <h2 class="results-title">Generated Images</h2>
+                    <div class="results-container" id="imageResults">
+                        <!-- Results will be displayed here -->
+                    </div>
+                    <div class="loading" id="imageLoading">
+                        <div class="loading-spinner"></div>
+                        <p>Generating images... This may take a few moments.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="video-generation">
+            <div class="grid-container">
+                <div>
+                    <div class="form-group">
+                        <label for="videoImageUpload">Source Image (Required)</label>
+                        <div class="image-upload" id="videoImageUploadContainer">
+                            <input type="file" id="videoImageUpload" accept="image/*">
+                            <div class="image-upload-icon">📷</div>
+                            <div class="image-upload-text">Click to upload or drag and drop</div>
+                        </div>
+                        <img id="videoPreviewImage" class="preview-image">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoPrompt">Prompt</label>
+                        <textarea id="videoPrompt" placeholder="Describe how the image should animate..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoNegativePrompt">Negative Prompt (Optional)</label>
+                        <textarea id="videoNegativePrompt" placeholder="Describe what you want to avoid in the video..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoMode">Generation Mode</label>
+                        <select id="videoMode">
+                            <option value="standard">Standard (Faster)</option>
+                            <option value="professional">Professional (Higher Quality)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoModel">Model Version</label>
+                        <select id="videoModel">
+                            <option value="V1.0">Kling V1.0</option>
+                            <option value="V1.5">Kling V1.5</option>
+                            <option value="V1.6">Kling V1.6</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoDuration">Video Duration</label>
+                        <select id="videoDuration">
+                            <option value="5">5 seconds</option>
+                            <option value="10">10 seconds</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="videoAspectRatio">Aspect Ratio</label>
+                        <select id="videoAspectRatio">
+                            <option value="1:1">1:1 (Square)</option>
+                            <option value="4:3">4:3 (Standard)</option>
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="9:16">9:16 (Portrait)</option>
+                        </select>
+                    </div>
+
+                    <button id="generateVideoButton" class="button">Generate Video</button>
+                </div>
+
+                <div class="results-section">
+                    <h2 class="results-title">Generated Videos</h2>
+                    <div class="results-container" id="videoResults">
+                        <!-- Results will be displayed here -->
+                    </div>
+                    <div class="loading" id="videoLoading">
+                        <div class="loading-spinner"></div>
+                        <p>Generating video... This may take a few minutes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global error handling for API requests
+        function handleApiError(error, context) {
+            console.error(\`\${context} error:\`, error);
+            
+            let errorMessage = "An unexpected error occurred.";
+            
+            if (error.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                const status = error.response.status;
+                const data = error.response.data;
+                
+                if (status === 401 || status === 403) {
+                    errorMessage = "Authentication failed. Please check your API keys.";
+                } else if (status === 400) {
+                    errorMessage = \`Bad request: \${data.message || "Please check your inputs"}\`;
+                } else if (status === 429) {
+                    errorMessage = "Rate limit exceeded. Please try again later.";
+                } else if (status >= 500) {
+                    errorMessage = "Server error. Please try again later.";
+                }
+            } else if (error.request) {
+                // The request was made but no response was received
+                errorMessage = "No response from server. Please check your internet connection.";
+            }
+            
+            // Display error to user
+            alert(\`\${context}: \${errorMessage}\`);
+        }
+
+        // Save API keys to localStorage
+        function saveApiKeys() {
+            const accessKey = document.getElementById('accessKey').value;
+            const secretKey = document.getElementById('secretKey').value;
+            
+            if (accessKey && secretKey) {
+                localStorage.setItem('klingAccessKey', accessKey);
+                localStorage.setItem('klingSecretKey', secretKey);
+            }
+        }
+
+        // Load API keys from localStorage
+        function loadApiKeys() {
+            const accessKey = localStorage.getItem('klingAccessKey');
+            const secretKey = localStorage.getItem('klingSecretKey');
+            
+            if (accessKey && secretKey) {
+                document.getElementById('accessKey').value = accessKey;
+                document.getElementById('secretKey').value = secretKey;
+            }
+        }
+        
+        // Tab Switching
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                
+                // Update active tab
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // API Settings Toggle
+        const settingsToggle = document.getElementById('settingsToggle');
+        const settingsContent = document.getElementById('settingsContent');
+
+        settingsToggle.addEventListener('click', () => {
+            if (settingsContent.classList.contains('show')) {
+                settingsContent.classList.remove('show');
+                settingsToggle.textContent = 'Show';
+            } else {
+                settingsContent.classList.add('show');
+                settingsToggle.textContent = 'Hide';
+            }
+        });
+
+        // Image Upload Preview - Image Generation
+        const imageUploadContainer = document.getElementById('imageUploadContainer');
+        const imageUpload = document.getElementById('imageUpload');
+        const previewImage = document.getElementById('previewImage');
+
+        imageUploadContainer.addEventListener('click', () => {
+            imageUpload.click();
+        });
+
+        imageUploadContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUploadContainer.style.borderColor = 'var(--primary)';
+        });
+
+        imageUploadContainer.addEventListener('dragleave', () => {
+            imageUploadContainer.style.borderColor = 'var(--gray-300)';
+        });
+
+        imageUploadContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUploadContainer.style.borderColor = 'var(--gray-300)';
+            
+            if (e.dataTransfer.files.length) {
+                imageUpload.files = e.dataTransfer.files;
+                handleImageUpload(imageUpload.files[0], previewImage);
+            }
+        });
+
+        imageUpload.addEventListener('change', () => {
+            if (imageUpload.files.length) {
+                handleImageUpload(imageUpload.files[0], previewImage);
+            }
+        });
+
+        // Image Upload Preview - Video Generation
+        const videoImageUploadContainer = document.getElementById('videoImageUploadContainer');
+        const videoImageUpload = document.getElementById('videoImageUpload');
+        const videoPreviewImage = document.getElementById('videoPreviewImage');
+
+        videoImageUploadContainer.addEventListener('click', () => {
+            videoImageUpload.click();
+        });
+
+        videoImageUploadContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            videoImageUploadContainer.style.borderColor = 'var(--primary)';
+        });
+
+        videoImageUploadContainer.addEventListener('dragleave', () => {
+            videoImageUploadContainer.style.borderColor = 'var(--gray-300)';
+        });
+
+        videoImageUploadContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            videoImageUploadContainer.style.borderColor = 'var(--gray-300)';
+            
+            if (e.dataTransfer.files.length) {
+                videoImageUpload.files = e.dataTransfer.files;
+                handleImageUpload(videoImageUpload.files[0], videoPreviewImage);
+            }
+        });
+
+        videoImageUpload.addEventListener('change', () => {
+            if (videoImageUpload.files.length) {
+                handleImageUpload(videoImageUpload.files[0], videoPreviewImage);
+            }
+        });
+
+        function handleImageUpload(file, previewElement) {
+            if (!file.type.match('image.*')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewElement.src = e.target.result;
+                previewElement.style.display = 'block';
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        // Reference Strength Slider
+        const strengthSlider = document.getElementById('imageReferenceStrength');
+        const strengthValue = document.getElementById('strengthValue');
+
+        strengthSlider.addEventListener('input', () => {
+            strengthValue.textContent = strengthSlider.value;
+        });
+
+        // Image Generation Logic
+        const generateImageButton = document.getElementById('generateImageButton');
+        const imagePrompt = document.getElementById('imagePrompt');
+        const imageNegativePrompt = document.getElementById('imageNegativePrompt');
+        const imageReferenceStrength = document.getElementById('imageReferenceStrength');
+        const imageAspectRatio = document.getElementById('imageAspectRatio');
+        const imageCount = document.getElementById('imageCount');
+        const imageResults = document.getElementById('imageResults');
+        const imageLoading = document.getElementById('imageLoading');
+
+        generateImageButton.addEventListener('click', async () => {
+            // Get access and secret keys
+            const accessKey = document.getElementById('accessKey').value;
+            const secretKey = document.getElementById('secretKey').value;
+
+            if (!accessKey || !secretKey) {
+                alert('Please enter your API credentials in the API Settings section');
+                return;
+            }
+
+            // Save keys for future use
+            saveApiKeys();
+
+            if (!imagePrompt.value.trim()) {
+                alert('Please enter a prompt');
+                return;
+            }
+
+            // Show loading
+            imageLoading.style.display = 'block';
+            generateImageButton.disabled = true;
+            imageResults.innerHTML = ''; // Clear previous results
+
+            try {
+                // Get aspect ratio values
+                const [width, height] = imageAspectRatio.value.split(':').map(Number);
+                
+                // Create FormData with the image if available
+                const formData = new FormData();
+                if (imageUpload.files.length) {
+                    formData.append('image', imageUpload.files[0]);
+                }
+                
+                // Add other parameters
+                formData.append('prompt', imagePrompt.value);
+                formData.append('negative_prompt', imageNegativePrompt.value || '');
+                formData.append('strength', imageReferenceStrength.value);
+                formData.append('aspect_ratio', imageAspectRatio.value);
+                formData.append('count', imageCount.value);
+                formData.append('access_key', accessKey);
+                formData.append('secret_key', secretKey);
+                
+                // Send to our Netlify function
+                const response = await fetch('/.netlify/functions/generate-image', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to generate image');
+                }
+                
+                const responseData = await response.json();
+                
+                // Handle created task - check for completion
+                const taskId = responseData.task_id;
+                await pollImageTaskStatus(taskId, accessKey, secretKey);
+                
+            } catch (error) {
+                handleApiError(error, 'Image Generation');
+            } finally {
+                // Hide loading
+                imageLoading.style.display = 'none';
+                generateImageButton.disabled = false;
+            }
+        });
+
+        // Poll for image task completion
+        async function pollImageTaskStatus(taskId, accessKey, secretKey) {
+            try {
+                // Create a status indicator
+                const statusElement = document.createElement('div');
+                statusElement.className = 'task-status pending';
+                statusElement.textContent = 'Task created, waiting for processing...';
+                imageResults.appendChild(statusElement);
+                
+                // Poll for status updates
+                let isCompleted = false;
+                let attempts = 0;
+                const maxAttempts = 30; // 5 minutes (10 second intervals)
+                
+                while (!isCompleted && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+                    
+                    const queryParams = new URLSearchParams({
+                        task_id: taskId,
+                        access_key: accessKey,
+                        secret_key: secretKey
+                    });
+                    
+                    const response = await fetch(\`/.netlify/functions/query-image-task?\${queryParams}\`);
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Failed to query task status');
+                    }
+                    
+                    const taskData = await response.json();
+                    
+                    // Update status display
+                    if (taskData.status === 'completed') {
+                        isCompleted = true;
+                        statusElement.className = 'task-status completed';
+                        statusElement.textContent = 'Task completed!';
+                        
+                        // Display the results
+                        displayImageResults(taskData.results, imagePrompt.value, imageNegativePrompt.value);
+                    } else if (taskData.status === 'failed') {
+                        isCompleted = true;
+                        statusElement.className = 'task-status failed';
+                        statusElement.textContent = \`Task failed: \${taskData.error || 'Unknown error'}\`;
+                    } else {
+                        statusElement.className = 'task-status processing';
+                        statusElement.textContent = \`Task processing... (\${Math.min(90, attempts * 3)}%)\`;
+                    }
+                    
+                    attempts++;
+                }
+                
+                if (!isCompleted) {
+                    statusElement.className = 'task-status failed';
+                    statusElement.textContent = 'Task timed out. It may still complete, please check again later.';
+                }
+                
+                // Scroll to results
+                imageResults.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                handleApiError(error, 'Task Status Check');
+            }
+        }
+
+        // Display Image Results
+        function displayImageResults(images, prompt, negativePrompt) {
+            // Remove any status indicator
+            const statusElements = document.querySelectorAll('.task-status');
+            statusElements.forEach(element => element.remove());
+            
+            images.forEach(image => {
+                const resultCard = document.createElement('div');
+                resultCard.className = 'result-card';
+                
+                resultCard.innerHTML = `
+                    <img src="${image.url}" alt="Generated image" class="result-image">
+                    <div class="result-info">
+                        <div class="result-prompt">${prompt}</div>
+                        ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+                        <div class="result-actions">
+                            <button class="result-button download-image-button">Download</button>
+                            <button class="result-button convert-button">Convert to Video</button>
+                        </div>
+                    </div>
+                `;
+                
+                // Add click handler for the download button
+                const downloadButton = resultCard.querySelector('.download-image-button');
+                downloadButton.addEventListener('click', () => {
+                    // Create a temporary anchor element and trigger download
+                    const a = document.createElement('a');
+                    a.href = image.url;
+                    a.download = `kling_image_${image.id || new Date().getTime()}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+                
+                // Add click handler for convert to video button
+                const convertButton = resultCard.querySelector('.convert-button');
+                convertButton.addEventListener('click', () => {
+                    // Switch to video tab
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    const videoTab = document.querySelector('.tab[data-tab="video-generation"]');
+                    videoTab.classList.add('active');
+                    
+                    const videoContent = document.getElementById('video-generation');
+                    videoContent.classList.add('active');
+                    
+                    // Create an Image object from the generated image URL
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function() {
+                        // Create a canvas to convert the image to a Blob
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        canvas.toBlob(blob => {
+                            // Create a File object from the Blob
+                            const file = new File([blob], 'generated-image.jpg', { type: 'image/jpeg' });
+                            
+                            // Create a DataTransfer object to set files
+                            const dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(file);
+                            videoImageUpload.files = dataTransfer.files;
+                            
+                            // Set the preview image
+                            videoPreviewImage.src = image.url;
+                            videoPreviewImage.style.display = 'block';
+                            
+                            // Set the video prompt to match the image prompt
+                            videoPrompt.value = prompt;
+                            
+                            // Scroll to the video generation section
+                            videoContent.scrollIntoView({ behavior: 'smooth' });
+                        }, 'image/jpeg');
+                    };
+                    
+                    img.src = image.url;
+                });
+                
+                imageResults.appendChild(resultCard);
+            });
+        }
+
+        // Video Generation Logic
+        const generateVideoButton = document.getElementById('generateVideoButton');
+        const videoPrompt = document.getElementById('videoPrompt');
+        const videoNegativePrompt = document.getElementById('videoNegativePrompt');
+        const videoMode = document.getElementById('videoMode');
+        const videoModel = document.getElementById('videoModel');
+        const videoDuration = document.getElementById('videoDuration');
+        const videoAspectRatio = document.getElementById('videoAspectRatio');
+        const videoResults = document.getElementById('videoResults');
+        const videoLoading = document.getElementById('videoLoading');
+
+        generateVideoButton.addEventListener('click', async () => {
+            // Get access and secret keys
+            const accessKey = document.getElementById('accessKey').value;
+            const secretKey = document.getElementById('secretKey').value;
+
+            if (!accessKey || !secretKey) {
+                alert('Please enter your API credentials in the API Settings section');
+                return;
+            }
+
+            // Save keys for future use
+            saveApiKeys();
+
+            if (!videoImageUpload.files.length) {
+                alert('Please upload a source image');
+                return;
+            }
+
+            if (!videoPrompt.value.trim()) {
+                alert('Please enter a prompt');
+                return;
+            }
+
+            // Check model compatibility
+            if (videoModel.value === 'V1.6' && videoMode.value === 'professional' && !confirm('Note: V1.6 model may work better with Standard mode. Continue with Professional mode?')) {
+                return;
+            }
+
+            // Show loading
+            videoLoading.style.display = 'block';
+            generateVideoButton.disabled = true;
+            videoResults.innerHTML = ''; // Clear previous results
+
+            try {
+                // Create FormData with the image
+                const formData = new FormData();
+                formData.append('image', videoImageUpload.files[0]);
+                
+                // Add other parameters
+                formData.append('prompt', videoPrompt.value);
+                formData.append('negative_prompt', videoNegativePrompt.value || '');
+                formData.append('mode', videoMode.value);
+                formData.append('model', videoModel.value);
+                formData.append('duration', videoDuration.value);
+                formData.append('aspect_ratio', videoAspectRatio.value);
+                formData.append('access_key', accessKey);
+                formData.append('secret_key', secretKey);
+                
+                // Send to our Netlify function
+                const response = await fetch('/.netlify/functions/generate-video', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to generate video');
+                }
+                
+                const responseData = await response.json();
+                
+                // Handle created task - check for completion
+                const taskId = responseData.task_id;
+                await pollVideoTaskStatus(taskId, accessKey, secretKey);
+                
+            } catch (error) {
+                handleApiError(error, 'Video Generation');
+            } finally {
+                // Hide loading
+                videoLoading.style.display = 'none';
+                generateVideoButton.disabled = false;
+            }
+        });
+
+        // Poll for video task completion
+        async function pollVideoTaskStatus(taskId, accessKey, secretKey) {
+            try {
+                // Create a status indicator
+                const statusElement = document.createElement('div');
+                statusElement.className = 'task-status pending';
+                statusElement.textContent = 'Task created, waiting for processing...';
+                videoResults.appendChild(statusElement);
+                
+                // Save source image for reference
+                const sourceImageURL = videoPreviewImage.src;
+                
+                // Poll for status updates
+                let isCompleted = false;
+                let attempts = 0;
+                const maxAttempts = 60; // 10 minutes (10 second intervals)
+                
+                while (!isCompleted && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+                    
+                    const queryParams = new URLSearchParams({
+                        task_id: taskId,
+                        access_key: accessKey,
+                        secret_key: secretKey
+                    });
+                    
+                    const response = await fetch(`/.netlify/functions/query-video-task?${queryParams}`);
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Failed to query task status');
+                    }
+                    
+                    const taskData = await response.json();
+                    
+                    // Update status display
+                    if (taskData.status === 'completed') {
+                        isCompleted = true;
+                        statusElement.className = 'task-status completed';
+                        statusElement.textContent = 'Task completed!';
+                        
+                        // Display the results
+                        displayVideoResults(taskData.results, videoPrompt.value, videoNegativePrompt.value, sourceImageURL);
+                    } else if (taskData.status === 'failed') {
+                        isCompleted = true;
+                        statusElement.className = 'task-status failed';
+                        statusElement.textContent = `Task failed: ${taskData.error || 'Unknown error'}`;
+                    } else {
+                        statusElement.className = 'task-status processing';
+                        statusElement.textContent = `Task processing... (${Math.min(90, attempts * 1.5)}%)`;
+                    }
+                    
+                    attempts++;
+                }
+                
+                if (!isCompleted) {
+                    statusElement.className = 'task-status failed';
+                    statusElement.textContent = 'Task timed out. It may still complete, please check again later.';
+                }
+                
+                // Scroll to results
+                videoResults.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                handleApiError(error, 'Task Status Check');
+            }
+        }
+
+        // Display Video Results
+        function displayVideoResults(video, prompt, negativePrompt, sourceImageURL) {
+            // Remove any status indicator
+            const statusElements = document.querySelectorAll('.task-status');
+            statusElements.forEach(element => element.remove());
+            
+            const resultCard = document.createElement('div');
+            resultCard.className = 'result-card';
+            
+            // Add source image preview to show it was used in generation
+            const sourceImagePreview = sourceImageURL ? 
+                `<div class="source-image-container">
+                    <div class="source-image-label">Source Image Used:</div>
+                    <img src="${sourceImageURL}" alt="Source image" class="source-image-preview">
+                </div>` : '';
+            
+            resultCard.innerHTML = `
+                ${sourceImagePreview}
+                <video src="${video.url}" controls class="result-video"></video>
+                <div class="result-info">
+                    <div class="result-prompt">${prompt}</div>
+                    ${negativePrompt ? `<div class="result-prompt negative">Negative: ${negativePrompt}</div>` : ''}
+                    <div class="result-info-details">
+                        <div>Model: ${videoModel.value}</div>
+                        <div>Mode: ${videoMode.value}</div>
+                        <div>Duration: ${videoDuration.value}s</div>
+                    </div>
+                    <div class="result-actions">
+                        <button class="result-button download-button">Download</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add click handler for the download button
+            const downloadButton = resultCard.querySelector('.download-button');
+            downloadButton.addEventListener('click', () => {
+                // Create a temporary anchor element and trigger download
+                const a = document.createElement('a');
+                a.href = video.url;
+                a.download = `kling_video_${video.id || new Date().getTime()}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+            
+            videoResults.appendChild(resultCard);
+        }
+
+        // Load API keys on page load
+        document.addEventListener('DOMContentLoaded', loadApiKeys);
+    </script>
+</body>
+</html>`;
+
+// netlify.toml configuration file
+const netlifyToml = `[build]
+  command = "# no build command needed"
+  publish = "."
+
+[dev]
+  command = "npx serve"
+  port = 8888
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"`;
+
+// generate-image.js Netlify function
+const generateImageFunction = `// netlify/functions/generate-image.js
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const jwt = require('jsonwebtoken');
+const fileType = require('file-type');
+const multiparty = require('multiparty');
+const fs = require('fs');
+const util = require('util');
+const readFile = util.promisify(fs.readFile);
+
+// Function to generate API token
+function generateKlingToken(accessKey, secretKey) {
+  const now = Math.floor(Date.now() / 1000);
+  
+  const payload = {
+    iss: accessKey,
+    exp: now + 3600, // Token valid for 1 hour
+    iat: now
+  };
+  
+  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+}
+
+// Process the multipart form data
+async function parseMultipartForm(event) {
+  return new Promise((resolve, reject) => {
+    const form = new multiparty.Form();
+    
+    form.parse(event, (error, fields, files) => {
+      if (error) return reject(error);
+      
+      // Convert fields from arrays to single values
+      const processedFields = {};
+      Object.keys(fields).forEach(key => {
+        processedFields[key] = fields[key][0];
+      });
+      
+      resolve({
+        fields: processedFields,
+        files: files
+      });
+    });
+  });
+}
+
+exports.handler = async (event, context) => {
+  // Only allow POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' })
+    };
+  }
+  
+  try {
+    // Parse the multipart form data
+    const { fields, files } = await parseMultipartForm(event);
+    
+    // Get API credentials from the request
+    const accessKey = fields.access_key;
+    const secretKey = fields.secret_key;
+    
+    if (!accessKey || !secretKey) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Missing API credentials' })
+      };
+    }
+    
+    // Generate API token
+    const apiToken = generateKlingToken(accessKey, secretKey);
+    
+    // Prepare the API request data
+    const apiEndpoint = 'https://api.klingai.com/kolors/v1/text2image/create-task';
+    
+    // Create request body
+    const requestData = {
+      model_name: 'V1.0', // Assuming V1.0 as default
+      prompt: fields.prompt,
+      negative_prompt: fields.negative_prompt || '',
+      image_num: parseInt(fields.count) || 1
+    };
+    
+    // Handle aspect ratio
+    if (fields.aspect_ratio) {
+      const [width, height] = fields.aspect_ratio.split(':').map(Number);
+      requestData.width = width * 512; // Scale the ratio to actual pixels
+      requestData.height = height * 512;
+    }
+    
+    // Check if there's a reference image (image-to-image case)
+    if (files.image) {
+      const imageFile = files.image[0];
+      const imageBuffer = await readFile(imageFile.path);
+      const imgType = await fileType.fromBuffer(imageBuffer);
+      
+      if (!imgType || !imgType.mime.startsWith('image/')) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ message: 'Invalid image file' })
+        };
+      }
+      
+      // Convert image to base64
+      const base64Image = imageBuffer.toString('base64');
+      
+      // Add reference image to request
+      requestData.reference_image = \`data:\${imgType.mime};base64,\${base64Image}\`;
+      requestData.reference_strength = parseFloat(fields.strength) || 0.5;
+    }
+    
+    // Make the API request
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${apiToken}\`
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({
+          message: 'Error from Kling AI API',
+          error: responseData
+        })
+      };
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: 'Task created successfully',
+        task_id: responseData.task_id
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error:', error);
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error.message
+      })
+    };
+  }
+};`;
+
+// query-image-task.js Netlify function
+const queryImageTaskFunction = `// netlify/functions/query-image-task.js
+const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken');
+
+// Function to generate API token
+function generateKlingToken(accessKey, secretKey) {
+  const now = Math.floor(Date.now() / 1000);
+  
+  const payload = {
+    iss: accessKey,
+    exp: now + 3600, // Token valid for 1 hour
+    iat: now
+  };
+  
+  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+}
+
+exports.handler = async (event, context) => {
+  // Only allow GET requests
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' })
+    };
+  }
+  
+  try {
+    // Get query parameters
+    const params = event.queryStringParameters;
+    const taskId = params.task_id;
+    const accessKey = params.access_key;
+    const secretKey = params.secret_key;
+    
+    if (!taskId || !accessKey || !secretKey) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Missing required parameters' })
+      };
+    }
+    
+    // Generate API token
+    const apiToken = generateKlingToken(accessKey, secretKey);
+    
+    // Query the task status
+    const apiEndpoint = \`https://api.klingai.com/kolors/v1/text2image/query-task?task_id=\${taskId}\`;
+    
+    const response = await fetch(apiEndpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': \`Bearer \${apiToken}\`
+      }
+    });
+    
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({
+          message: 'Error from Kling AI API',
+          error: responseData
+        })
+      };
+    }
+    
+    // Process the response to standardize the format
+    let status = 'pending';
+    let results = [];
+    let error = null;
+    
+    if (responseData.status === 'SUCCESS') {
+      status = 'completed';
+      
+      // Process image results if available
+      if (responseData.data && responseData.data.images && responseData.data.images.length > 0) {
+        results = responseData.data.images.map(image => ({
+          id: image.id || \`img_\${Date.now()}\`,
+          url: image.url
+        }));
+      }
+    } else if (responseData.status === 'PENDING' || responseData.status === 'PROCESSING') {
+      status = 'processing';
+    } else {
+      status = 'failed';
+      error = responseData.message || 'Task failed';
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        status,
+        results,
+        error,
+        raw_response: responseData // Include raw response for debugging
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error:', error);
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error.message
+      })
+    };
+  }
+};`;
+
+// generate-video.js Netlify function
+const generateVideoFunction = `// netlify/functions/generate-video.js
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const jwt = require('jsonwebtoken');
+const fileType = require('file-type');
+const multiparty = require('multiparty');
+const fs = require('fs');
+const util = require('util');
+const readFile = util.promisify(fs.readFile);
+
+// Function to generate API token
+function generateKlingToken(accessKey, secretKey) {
+  const now = Math.floor(Date.now() / 1000);
+  
+  const payload = {
+    iss: accessKey,
+    exp: now + 3600, // Token valid for 1 hour
+    iat: now
+  };
+  
+  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+}
+
+// Process the multipart form data
+async function parseMultipartForm(event) {
+  return new Promise((resolve, reject) => {
+    const form = new multiparty.Form();
+    
+    form.parse(event, (error, fields, files) => {
+      if (error) return reject(error);
+      
+      // Convert fields from arrays to single values
+      const processedFields = {};
+      Object.keys(fields).forEach(key => {
+        processedFields[key] = fields[key][0];
+      });
+      
+      resolve({
+        fields: processedFields,
+        files: files
+      });
+    });
+  });
+}
+
+exports.handler = async (event, context) => {
+  // Only allow POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' })
+    };
+  }
+  
+  try {
+    // Parse the multipart form data
+    const { fields, files } = await parseMultipartForm(event);
+    
+    // Get API credentials from the request
+    const accessKey = fields.access_key;
+    const secretKey = fields.secret_key;
+    
+    if (!accessKey || !secretKey) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Missing API credentials' })
+      };
+    }
+    
+    // Generate API token
+    const apiToken = generateKlingToken(accessKey, secretKey);
+    
+    // Prepare the API request data
+    const apiEndpoint = 'https://api.klingai.com/kling/v1/img2video/create-task';
+    
+    // Check if there's a source image (required for image-to-video)
+    if (!files.image || !files.image[0]) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Source image is required' })
+      };
+    }
+    
+    const imageFile = files.image[0];
+    const imageBuffer = await readFile(imageFile.path);
+    const imgType = await fileType.fromBuffer(imageBuffer);
+    
+    if (!imgType || !imgType.mime.startsWith('image/')) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Invalid image file' })
+      };
+    }
+    
+    // Convert image to base64
+    const base64Image = imageBuffer.toString('base64');
+    
+    // Create request body based on the model version
+    const modelName = fields.model || 'V1.0';
+    const mode = fields.mode || 'standard';
+    const duration = parseInt(fields.duration) || 5;
+    
+    // Create request body
+    const requestData = {
+      model_name: modelName,
+      mode: mode,
+      prompt: fields.prompt,
+      negative_prompt: fields.negative_prompt || '',
+      reference_image: \`data:\${imgType.mime};base64,\${base64Image}\`,
+      reference_strength: 0.8, // Default strength for image reference
+      creativity_strength: 0.2, // Default creativity strength
+      video_length: duration,
+      fps: 24 // Standard fps
+    };
+    
+    // Handle aspect ratio if provided
+    if (fields.aspect_ratio) {
+      const [width, height] = fields.aspect_ratio.split(':').map(Number);
+      // Scale to appropriate dimensions based on ratio
+      const baseSize = 512;
+      requestData.width = width * baseSize;
+      requestData.height = height * baseSize;
+    }
+    
+    // Make the API request
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': \`Bearer \${apiToken}\`
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({
+          message: 'Error from Kling AI API',
+          error: responseData
+        })
+      };
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: 'Task created successfully',
+        task_id: responseData.task_id
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error:', error);
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error.message
+      })
+    };
+  }
+};`;
+
+// query-video-task.js Netlify function
+const queryVideoTaskFunction = `// netlify/functions/query-video-task.js
+const fetch = require('node-fetch');
+const jwt = require('jsonwebtoken');
+
+// Function to generate API token
+function generateKlingToken(accessKey, secretKey) {
+  const now = Math.floor(Date.now() / 1000);
+  
+  const payload = {
+    iss: accessKey,
+    exp: now + 3600, // Token valid for 1 hour
+    iat: now
+  };
+  
+  return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
+}
+
+exports.handler = async (event, context) => {
+  // Only allow GET requests
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' })
+    };
+  }
+  
+  try {
+    // Get query parameters
+    const params = event.queryStringParameters;
+    const taskId = params.task_id;
+    const accessKey = params.access_key;
+    const secretKey = params.secret_key;
+    
+    if (!taskId || !accessKey || !secretKey) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Missing required parameters' })
+      };
+    }
+    
+    // Generate API token
+    const apiToken = generateKlingToken(accessKey, secretKey);
+    
+    // Query the task status
+    const apiEndpoint = \`https://api.klingai.com/kling/v1/img2video/query-task?task_id=\${taskId}\`;
+    
+    const response = await fetch(apiEndpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': \`Bearer \${apiToken}\`
+      }
+    });
+    
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({
+          message: 'Error from Kling AI API',
+          error: responseData
+        })
+      };
+    }
+    
+    // Process the response to standardize the format
+    let status = 'pending';
+    let results = null;
+    let error = null;
+    
+    if (responseData.status === 'SUCCESS') {
+      status = 'completed';
+      
+      // Process video results
+      if (responseData.data && responseData.data.video_url) {
+        results = {
+          id: responseData.task_id || \`vid_\${Date.now()}\`,
+          url: responseData.data.video_url
+        };
+      }
+    } else if (responseData.status === 'PENDING' || responseData.status === 'PROCESSING') {
+      status = 'processing';
+    } else {
+      status = 'failed';
+      error = responseData.message || 'Task failed';
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        status,
+        results,
+        error,
+        raw_response: responseData // Include raw response for debugging
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error:', error);
+    
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error.message
+      })
+    };
+  }
+};`;
+
+// package.json for dependencies
+const packageJson = `{
+  "name": "kling-ai-interface",
+  "version": "1.0.0",
+  "description": "Interface for Kling AI image and video generation",
+  "main": "index.html",
+  "scripts": {
+    "start": "netlify dev",
+    "serve": "serve ."
+  },
+  "dependencies": {
+    "file-type": "^16.5.4",
+    "form-data": "^4.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "multiparty": "^4.2.3",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "netlify-cli": "^12.0.0",
+    "serve": "^14.0.0"
+  }
+}`;
+
+// README.md with setup instructions
+const readmeFile = `# Kling AI Interface
+
+An interface for generating images and videos using the Kling AI API.
+
+## Setup
+
+1. Clone this repository
+2. Install dependencies:
+   \`\`\`
+   npm install
+   \`\`\`
+3. Run the development server:
+   \`\`\`
+   npm start
+   \`\`\`
+   
+## API Configuration
+
+You'll need to obtain an Access Key and Secret Key from Kling AI to use this interface.
+Enter these credentials in the API Settings section of the interface.
+
+## Deployment
+
+This project is set up to be deployed to Netlify.
+
+1. Install the Netlify CLI:
+   \`\`\`
+   npm install -g netlify-cli
+   \`\`\`
+2. Login to Netlify:
