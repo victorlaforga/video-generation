@@ -775,6 +775,8 @@
         const imageLoading = document.getElementById('imageLoading');
 
         generateImageButton.addEventListener('click', async () => {
+          console.log('Image generation button clicked');
+          
           // Get access and secret keys
           const accessKey = document.getElementById('accessKey').value;
           const secretKey = document.getElementById('secretKey').value;
@@ -798,7 +800,7 @@
           imageResults.innerHTML = ''; // Clear previous results
         
           try {
-            // Create request data object
+            // Create simple JSON data for testing
             const requestData = {
               prompt: imagePrompt.value,
               negative_prompt: imageNegativePrompt.value || '',
@@ -806,23 +808,14 @@
               aspect_ratio: imageAspectRatio.value,
               count: imageCount.value,
               access_key: accessKey,
-              secret_key: secretKey
+              secret_key: secretKey,
+              testing: true // Flag for testing
             };
         
-            // If there's an image, convert it to base64
-            if (imageUpload.files.length > 0) {
-              const file = imageUpload.files[0];
-              const base64Image = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.readAsDataURL(file);
-              });
-              
-              requestData.image_base64 = base64Image;
-            }
-        
-            // Send to our Netlify function
             console.log('Sending image generation request...');
+            console.log('Request data (without base64):', {...requestData, access_key: '***', secret_key: '***'});
+            
+            // First try without the image to test basic functionality
             const response = await fetch('/.netlify/functions/generate-image', {
               method: 'POST',
               headers: {
@@ -831,7 +824,17 @@
               body: JSON.stringify(requestData)
             });
             
-            const responseData = await response.json();
+            console.log('Response status:', response.status);
+            const responseText = await response.text();
+            console.log('Response text:', responseText);
+            
+            let responseData;
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (e) {
+              console.error('Failed to parse response as JSON:', e);
+              throw new Error('Invalid response from server: ' + responseText);
+            }
             
             if (!response.ok) {
               throw new Error(responseData.message || 'Failed to generate image');
@@ -839,13 +842,21 @@
             
             console.log('Image generation task created:', responseData);
             
-            // Handle created task - check for completion
-            const taskId = responseData.task_id;
-            await pollImageTaskStatus(taskId, accessKey, secretKey);
+            // Mock success for testing
+            alert('Task created with ID: ' + responseData.task_id);
+            
+            // Handle created task - normally we would poll here
+            // await pollImageTaskStatus(taskId, accessKey, secretKey);
+            
+            // For now, just display some mock results
+            displayImageResults([
+              {id: 'mock1', url: 'https://picsum.photos/seed/test1/400/400'},
+              {id: 'mock2', url: 'https://picsum.photos/seed/test2/400/400'}
+            ], imagePrompt.value, imageNegativePrompt.value);
             
           } catch (error) {
             console.error('Image generation error:', error);
-            handleApiError(error, 'Image Generation');
+            alert('Image Generation Error: ' + error.message);
           } finally {
             // Hide loading
             imageLoading.style.display = 'none';
@@ -853,94 +864,102 @@
           }
         });
 
+
         generateVideoButton.addEventListener('click', async () => {
-          console.log('Video generation button clicked');
-          
-          // Get access and secret keys
-          const accessKey = document.getElementById('accessKey').value;
-          const secretKey = document.getElementById('secretKey').value;
-        
-          if (!accessKey || !secretKey) {
-            alert('Please enter your API credentials in the API Settings section');
-            return;
-          }
-        
-          // Save keys for future use
-          saveApiKeys();
-        
-          if (!videoImageUpload.files.length) {
-            alert('Please upload a source image');
-            return;
-          }
-        
-          if (!videoPrompt.value.trim()) {
-            alert('Please enter a prompt');
-            return;
-          }
-        
-          // Check model compatibility
-          if (videoModel.value === 'V1.6' && videoMode.value === 'professional' && !confirm('Note: V1.6 model may work better with Standard mode. Continue with Professional mode?')) {
-            return;
-          }
-        
-          // Show loading
-          videoLoading.style.display = 'block';
-          generateVideoButton.disabled = true;
-          videoResults.innerHTML = ''; // Clear previous results
-        
-          try {
-            // Convert image to base64
-            const file = videoImageUpload.files[0];
-            const base64Image = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.readAsDataURL(file);
-            });
-            
-            // Create request data object
-            const requestData = {
-              prompt: videoPrompt.value,
-              negative_prompt: videoNegativePrompt.value || '',
-              mode: videoMode.value,
-              model: videoModel.value,
-              duration: videoDuration.value,
-              aspect_ratio: videoAspectRatio.value,
-              image_base64: base64Image,
-              access_key: accessKey,
-              secret_key: secretKey
-            };
-            
-            // Send to our Netlify function
-            console.log('Sending video generation request...');
-            const response = await fetch('/.netlify/functions/generate-video', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(requestData)
-            });
-            
-            const responseData = await response.json();
-            
-            if (!response.ok) {
-              throw new Error(responseData.message || 'Failed to generate video');
-            }
-            
-            console.log('Video generation task created:', responseData);
-            
-            // Handle created task - check for completion
-            const taskId = responseData.task_id;
-            await pollVideoTaskStatus(taskId, accessKey, secretKey);
-            
-          } catch (error) {
-            console.error('Video generation error:', error);
-            handleApiError(error, 'Video Generation');
-          } finally {
-            // Hide loading
-            videoLoading.style.display = 'none';
-            generateVideoButton.disabled = false;
-          }
-        });
+  console.log('Video generation button clicked');
+  
+  // Get access and secret keys
+  const accessKey = document.getElementById('accessKey').value;
+  const secretKey = document.getElementById('secretKey').value;
+
+  if (!accessKey || !secretKey) {
+    alert('Please enter your API credentials in the API Settings section');
+    return;
+  }
+
+  // Save keys for future use
+  saveApiKeys();
+
+  if (!videoImageUpload.files.length) {
+    alert('Please upload a source image');
+    return;
+  }
+
+  if (!videoPrompt.value.trim()) {
+    alert('Please enter a prompt');
+    return;
+  }
+
+  // Show loading
+  videoLoading.style.display = 'block';
+  generateVideoButton.disabled = true;
+  videoResults.innerHTML = ''; // Clear previous results
+
+  try {
+    // Create simple JSON data for testing first (without image)
+    const requestData = {
+      prompt: videoPrompt.value,
+      negative_prompt: videoNegativePrompt.value || '',
+      mode: videoMode.value,
+      model: videoModel.value,
+      duration: videoDuration.value,
+      aspect_ratio: videoAspectRatio.value,
+      access_key: accessKey,
+      secret_key: secretKey,
+      testing: true // Flag for testing
+    };
+
+    console.log('Sending video generation request without image for testing...');
+    console.log('Request data (without base64):', {...requestData, access_key: '***', secret_key: '***'});
+    
+    // First try without the image to test basic functionality
+    const response = await fetch('/.netlify/functions/generate-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    console.log('Response status:', response.status);
+    const responseText = await response.text();
+    console.log('Response text:', responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse response as JSON:', e);
+      throw new Error('Invalid response from server: ' + responseText);
+    }
+    
+    if (!response.ok) {
+      throw new Error(responseData.message || 'Failed to generate video');
+    }
+    
+    console.log('Video generation task created:', responseData);
+    
+    // Mock success for testing
+    alert('Task created with ID: ' + responseData.task_id);
+    
+    // Mock results display
+    displayVideoResults(
+      {id: 'mock_vid', url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'}, 
+      videoPrompt.value, 
+      videoNegativePrompt.value, 
+      videoPreviewImage.src
+    );
+    
+  } catch (error) {
+    console.error('Video generation error:', error);
+    alert('Video Generation Error: ' + error.message);
+  } finally {
+    // Hide loading
+    videoLoading.style.display = 'none';
+    generateVideoButton.disabled = false;
+  }
+});
+
         // Poll for image task completion
         async function pollImageTaskStatus(taskId, accessKey, secretKey) {
             try {
@@ -1092,3 +1111,18 @@
             });
         }
       </script>
+      <button id="testFunction" style="background-color: green; color: white; padding: 10px; margin: 10px;">Test Netlify Function</button>
+
+<script>
+document.getElementById('testFunction').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/.netlify/functions/test-function');
+    const data = await response.json();
+    console.log('Test function response:', data);
+    alert('Test function works! See console for details.');
+  } catch (error) {
+    console.error('Test function error:', error);
+    alert('Test function failed: ' + error.message);
+  }
+});
+</script>
