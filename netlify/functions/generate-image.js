@@ -1,12 +1,6 @@
 // netlify/functions/generate-image.js
 const fetch = require('node-fetch');
-const FormData = require('form-data');
 const jwt = require('jsonwebtoken');
-const fileType = require('file-type');
-const multiparty = require('multiparty');
-const fs = require('fs');
-const util = require('util');
-const readFile = util.promisify(fs.readFile);
 
 // Function to generate API token
 function generateKlingToken(accessKey, secretKey) {
@@ -21,50 +15,6 @@ function generateKlingToken(accessKey, secretKey) {
   return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
 }
 
-// Process the multipart form data
-async function parseMultipartForm(event) {
-  // Check if the event.body is base64 encoded
-  if (event.isBase64Encoded) {
-    event.body = Buffer.from(event.body, 'base64').toString();
-  }
-  
-  return new Promise((resolve, reject) => {
-    const form = new multiparty.Form();
-    
-    // Mock a req object that multiparty can work with
-    const req = {
-      headers: event.headers,
-      body: event.body
-    };
-    
-    // Add an 'on' function to handle the data
-    req.on = function(event, handler) {
-      if (event === 'data') {
-        handler(Buffer.from(this.body));
-      }
-      if (event === 'end') {
-        handler();
-      }
-      return this;
-    };
-    
-    form.parse(req, (error, fields, files) => {
-      if (error) return reject(error);
-      
-      // Convert fields from arrays to single values
-      const processedFields = {};
-      Object.keys(fields).forEach(key => {
-        processedFields[key] = fields[key][0];
-      });
-      
-      resolve({
-        fields: processedFields,
-        files: files
-      });
-    });
-  });
-}
-
 exports.handler = async (event, context) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
@@ -75,12 +25,20 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    // Parse the multipart form data
-    const { fields, files } = await parseMultipartForm(event);
+    // Parse the request body as JSON
+    let data;
+    try {
+      data = JSON.parse(event.body);
+    } catch (e) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Invalid request body. JSON expected.' })
+      };
+    }
     
     // Get API credentials from the request
-    const accessKey = fields.access_key;
-    const secretKey = fields.secret_key;
+    const accessKey = data.access_key;
+    const secretKey = data.secret_key;
     
     if (!accessKey || !secretKey) {
       return {
@@ -98,37 +56,23 @@ exports.handler = async (event, context) => {
     // Create request body
     const requestData = {
       model_name: 'V1.0', // Assuming V1.0 as default
-      prompt: fields.prompt,
-      negative_prompt: fields.negative_prompt || '',
-      image_num: parseInt(fields.count) || 1
+      prompt: data.prompt,
+      negative_prompt: data.negative_prompt || '',
+      image_num: parseInt(data.count) || 1
     };
     
     // Handle aspect ratio
-    if (fields.aspect_ratio) {
-      const [width, height] = fields.aspect_ratio.split(':').map(Number);
+    if (data.aspect_ratio) {
+      const [width, height] = data.aspect_ratio.split(':').map(Number);
       requestData.width = width * 512; // Scale the ratio to actual pixels
       requestData.height = height * 512;
     }
     
     // Check if there's a reference image (image-to-image case)
-    if (files.image) {
-      const imageFile = files.image[0];
-      const imageBuffer = await readFile(imageFile.path);
-      const imgType = await fileType.fromBuffer(imageBuffer);
-      
-      if (!imgType || !imgType.mime.startsWith('image/')) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ message: 'Invalid image file' })
-        };
-      }
-      
-      // Convert image to base64
-      const base64Image = imageBuffer.toString('base64');
-      
+    if (data.image_base64) {
       // Add reference image to request
-      requestData.reference_image = `data:${imgType.mime};base64,${base64Image}`;
-      requestData.reference_strength = parseFloat(fields.strength) || 0.5;
+      requestData.reference_image = data.image_base64;
+      requestData.reference_strength = parseFloat(data.strength) || 0.5;
     }
     
     // Make the API request
@@ -168,7 +112,8 @@ exports.handler = async (event, context) => {
       statusCode: 500,
       body: JSON.stringify({
         message: 'Internal server error',
-        error: error.message
+        error: error.toString(),
+        stack: error.stack
       })
     };
   }
